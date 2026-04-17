@@ -1,120 +1,64 @@
-﻿const demoButton = document.getElementById("demoButton");
-const formMessage = document.getElementById("formMessage");
-const feedbackForm = document.getElementById("feedbackForm");
-const feedbackList = document.getElementById("feedbackList");
-const feedbackStatus = document.getElementById("feedbackStatus");
-const refreshFeedback = document.getElementById("refreshFeedback");
-const API_BASE = "http://127.0.0.1:8000";
+// Firebase config (paste yours)
+const firebaseConfig = {
+  apiKey: "AIzaSyAGrW7X5_596VeRKlvSYnVkSCwtsovs_Kk",
+  authDomain: "beyond-friends-4b7f6.firebaseapp.com",
+  projectId: "beyond-friends-4b7f6",
+};
 
-if (demoButton && formMessage) {
-  demoButton.addEventListener("click", () => {
-    formMessage.textContent = "This sample form is not connected to the database. The opinions form below is the working part.";
-  });
-}
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+// Submit feedback
+document.getElementById("feedbackForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-function formatDate(dateText) {
-  const date = new Date(dateText);
-
-  if (Number.isNaN(date.getTime())) {
-    return dateText;
-  }
-
-  return date.toLocaleString();
-}
-
-function renderFeedback(items) {
-  if (!feedbackList) {
-    return;
-  }
-
-  if (!items.length) {
-    feedbackList.innerHTML = '<p class="empty-state">No opinions yet. Be the first one to post feedback.</p>';
-    return;
-  }
-
-  feedbackList.innerHTML = items
-    .map((item) => `
-      <article class="feedback-item">
-        <div class="feedback-meta">
-          <span class="feedback-name">${escapeHtml(item.name)}</span>
-          <span class="feedback-role">${escapeHtml(item.role)}</span>
-          <span class="feedback-date">${escapeHtml(formatDate(item.created_at))}</span>
-        </div>
-        <p class="feedback-text">${escapeHtml(item.message)}</p>
-      </article>
-    `)
-    .join("");
-}
-
-async function loadFeedback() {
-  if (!feedbackList) {
-    return;
-  }
+  const name = document.getElementById("feedbackName").value;
+  const role = document.getElementById("feedbackRole").value;
+  const message = document.getElementById("feedbackMessage").value;
 
   try {
-    const response = await fetch(`${API_BASE}/api/feedback`);
+    await db.collection("feedback").add({
+      name,
+      role,
+      message,
+      createdAt: new Date()
+    });
 
-    if (!response.ok) {
-      throw new Error("Unable to load feedback.");
-    }
+    document.getElementById("feedbackStatus").innerText = "✅ Feedback saved!";
+    e.target.reset();
+    loadFeedback();
 
-    const items = await response.json();
-    renderFeedback(items);
-  } catch (error) {
-    feedbackList.innerHTML = '<p class="empty-state">Start the Python server to load saved opinions.</p>';
+  } catch (err) {
+    console.error(err);
+    document.getElementById("feedbackStatus").innerText = "❌ Error saving";
   }
-}
+});
 
-if (feedbackForm && feedbackStatus) {
-  feedbackForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
+// Load feedback
+async function loadFeedback() {
+  const list = document.getElementById("feedbackList");
+  list.innerHTML = "";
 
-    const payload = {
-      name: document.getElementById("feedbackName").value.trim(),
-      role: document.getElementById("feedbackRole").value,
-      message: document.getElementById("feedbackMessage").value.trim()
-    };
+  const snapshot = await db.collection("feedback").orderBy("createdAt", "desc").get();
 
-    if (!payload.name || !payload.message) {
-      feedbackStatus.textContent = "Please enter your name and opinion before submitting.";
-      return;
-    }
+  snapshot.forEach(doc => {
+    const data = doc.data();
 
-    feedbackStatus.textContent = "Saving opinion...";
-
-    try {
-      const response = await fetch(`${API_BASE}/api/feedback`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to save opinion.");
-      }
-
-      feedbackForm.reset();
-      feedbackStatus.textContent = "Opinion saved to the database.";
-      await loadFeedback();
-    } catch (error) {
-      feedbackStatus.textContent = "Could not save opinion. Make sure the Python server is running.";
-    }
+    list.innerHTML += `
+      <div style="margin-bottom:10px; padding:10px; border:1px solid #ccc;">
+        <strong>${data.name}</strong> (${data.role})
+        <p>${data.message}</p>
+      </div>
+    `;
   });
 }
 
-if (refreshFeedback) {
-  refreshFeedback.addEventListener("click", loadFeedback);
-}
-
+// Load on start
 loadFeedback();
+
+// Refresh button
+document.getElementById("refreshFeedback").addEventListener("click", loadFeedback);﻿
+
+
+       
